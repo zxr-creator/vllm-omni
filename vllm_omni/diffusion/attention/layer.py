@@ -1251,6 +1251,11 @@ class Attention(nn.Module):
             if strategy_name == "ulysses" and get_ulysses_mode(default="strict") != "strict":
                 raise NotImplementedError("paged Scheduler KV currently supports only strict Ulysses")
 
+        if self.attn_backend is not None and getattr(self.attn_backend, "owns_sequence_parallel", False):
+            if use_paged_attention or not strategy.enabled or strategy.name != "ring":
+                raise ValueError("Backend-owned sequence parallelism requires an active pure Ring region")
+            return self.attention.forward(query, key, value, self._with_kv_cache_dtype(attn_metadata))
+
         # 1. Prepare inputs (Communication / Resharding)
         # For Ulysses: AllToAll Q/K/V; Slicing joint_q/k/v
         # For Ring: Concat joint_q
